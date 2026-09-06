@@ -697,3 +697,29 @@ def get_cadre_analytics() -> pd.DataFrame:
     )
     conn.close()
     return df
+
+
+def enroll_officer_course(officer_id: str, course_id: str) -> None:
+    """
+    Enroll an officer in an iGOT course and persist the completed course ID into SQLite.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT completed_courses_csv FROM officers WHERE officer_id = ?",
+        (officer_id,),
+    )
+    row = cursor.fetchone()
+    if row:
+        raw_csv = row["completed_courses_csv"] or ""
+        existing = [c.strip() for c in raw_csv.split(",") if c.strip()]
+        if course_id not in existing:
+            existing.append(course_id)
+            new_csv = ",".join(existing)
+            cursor.execute(
+                "UPDATE officers SET completed_courses_csv = ? WHERE officer_id = ?",
+                (new_csv, officer_id),
+            )
+            conn.commit()
+    conn.close()
+
