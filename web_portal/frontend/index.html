@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+    <meta name="color-scheme" content="light" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏛️</text></svg>" />
+    <title>Karmayogi Statistical Intelligence (KSI) | MoSPI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Inline Polyfills for Mobile Safari & Older Android Browsers -->
+    <script>
+      // Object.hasOwn polyfill (iOS Safari < 15.4)
+      if (!Object.hasOwn) {
+        Object.hasOwn = function (obj, prop) {
+          return Object.prototype.hasOwnProperty.call(obj, prop);
+        };
+      }
+      // Array.prototype.at polyfill
+      if (!Array.prototype.at) {
+        Array.prototype.at = function (n) {
+          n = Math.trunc(n) || 0;
+          if (n < 0) n += this.length;
+          if (n < 0 || n >= this.length) return undefined;
+          return this[n];
+        };
+      }
+      // Global runtime error reporter preventing silent blank screens on mobile
+      window.addEventListener('error', function (e) {
+        console.error('[KSI Mobile Error]', e.error || e.message);
+        var root = document.getElementById('root');
+        if (root && (!root.childNodes || root.childNodes.length === 0)) {
+          root.innerHTML = '<div style="margin:20px;padding:24px;background:#fff1f2;border:1.5px solid #e11d48;border-radius:12px;font-family:-apple-system,sans-serif;color:#1e293b;">'
+            + '<h2 style="color:#e11d48;margin:0 0 8px;font-size:18px;font-weight:bold;">Application Recovery Mode</h2>'
+            + '<p style="font-size:13px;color:#64748b;margin:0 0 12px;">A script initialization error occurred on this browser device:</p>'
+            + '<pre style="background:#ffffff;padding:12px;border:1px solid #fecdd3;border-radius:8px;font-size:11px;color:#e11d48;overflow-x:auto;white-space:pre-wrap;">' + (e.error ? (e.error.stack || e.error.message) : e.message) + '</pre>'
+            + '<button onclick="window.location.reload(true)" style="margin-top:14px;background:#f58220;color:#ffffff;border:none;padding:10px 20px;border-radius:20px;font-weight:bold;cursor:pointer;font-size:13px;">Tap to Reload</button>'
+            + '</div>';
+        }
+      });
+    </script>
+  </head>
+  <body class="bg-[#fdf8f3] text-slate-900 antialiased selection:bg-blue-100 selection:text-blue-900 font-sans">
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

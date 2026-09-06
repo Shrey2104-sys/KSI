@@ -1,0 +1,87 @@
+================================================================================
+KSS / MoSPI - SIH26101: Karmayogi Statistical Intelligence (KSI)
+TICKET 1: PROCESS CHALLENGES AND FIXES
+================================================================================
+
+1. Challenge: In-Memory Fallback vs. True SQLite Persistence & Module Reload Invariance
+   - Problem:
+     Initial seeding on module import (`import db`) often causes data reset
+     bugs. When a module is reloaded via `importlib.reload(db)`, a naive init
+     script overwrites existing records or re-inserts default seed values. This
+     would overwrite live updates (e.g. updating Technical Tools to 91 would
+     revert back to initial 48 upon module reload).
+   - Fix:
+     Engineered strictly idempotent schema initialization using `CREATE TABLE
+     IF NOT EXISTS` coupled with conditional seeding guards (`SELECT COUNT(*)
+     FROM officer_scores WHERE officer_id = ?`). Default scores are only
+     inserted if no scores exist for that officer. Score updates use atomic
+     SQLite upserts (`INSERT ... ON CONFLICT(officer_id, domain) DO UPDATE SET
+     score = excluded.score`) and commit directly to disk (`ksi_master.db`),
+     guaranteeing state persistence across imports and process restarts.
+
+2. Challenge: Negative Case Lookups and Hardcoded Stub Regression
+   - Problem:
+     Mock implementations or early prototypes often return default stub objects
+     for any queried identifier. This causes tests querying non-existent
+     officer IDs (`NONEXISTENT-ID`) to erroneously receive an object rather
+     than `None`.
+   - Fix:
+     Implemented dynamic SQL querying in `get_officer(officer_id)` using
+     parameterized SQL (`SELECT ... WHERE officer_id = ?`). If no matching
+     record is found in the `officers` table, the function cleanly and
+     immediately returns `None`.
+
+3. Challenge: Domain Name Canonicalization vs. Shorthand Alias Querying
+   - Problem:
+     Syllabus course titles and prompt instructions use shortened domain
+     references (e.g., "Statistical Theory", "Technical Tools", "Managerial
+     Skills"), while administrative role benchmarks and officer profiles use
+     canonical domain titles (e.g., "Statistical Theory & National Accounts",
+     "Technical Tools (Python, R, SQL, GIS)", "Managerial & Public Decision
+     Making"). Strict exact-string SQL equality would fail to find courses
+     when queried by shorthand or full name.
+   - Fix:
+     Normalized the database schema to store the 4 canonical MoSPI competency
+     domain strings. In `get_courses_by_domain(domain)`, implemented a multi-tier
+     resolution mechanism with `DOMAIN_CANONICAL_MAP` and pattern matching
+     (`WHERE domain = ? OR domain = ? OR domain LIKE ? OR ? LIKE ('%' || domain || '%')`),
+     guaranteeing seamless retrieval whether queried with formal or colloquial terms.
+
+4. Challenge: Dual-Access Compatibility for Precomputed Zero-Latency Demo Cache
+   - Problem:
+     Offline demonstration pipelines require instant, zero-latency responses
+     without relying on live LLM endpoints. However, different consuming modules
+     expect different return types: some access the cache as a native Python dict
+     (`cache[hash]["current_scores"]`), while others expect a serialized JSON string
+     to parse with `json.loads(cache[hash])`. Supplying only a string or only a dict
+     causes one of the workflows to fail.
+   - Fix:
+     Created a specialized `JsonResponse` class that inherits from `str` while
+     implementing dictionary methods (`__getitem__`, `get`, `keys`, `items`, `values`).
+     This allows the cache object to be parsed by `json.loads()`, string-indexed,
+     or accessed directly as a dictionary. Additionally, both raw and stripped
+     MD5 hashes of `DEFAULT_OFFICER_DOSSIER` and `SAMPLE_STATISTICAL_MANUAL`
+     were indexed in `PRECOMPUTED_DEMO_CACHE`.
+
+5. Challenge: Windows Environment Python Alias Conflict
+   - Problem:
+     In the Windows shell environment, invoking `python3` routed to the default
+     Windows App Execution Alias (Microsoft Store launcher) rather than the
+     installed Python 3.11.5 interpreter (`C:\Program Files\Python311\python.exe`),
+     yielding exit code 1.
+   - Fix:
+     Targeted the primary `python` binary executable directly for running the
+     strict validation tests and confirmed compatibility with Python 3.11.
+
+6. Challenge: Uninitialized Repository and Bytecode Clutter in Git
+   - Problem:
+     The workspace began as a clean, uninitialized directory without an active
+     Git repository, which blocked executing `git commit`. Additionally, running
+     test executions generated `__pycache__` and `*.pyc` files that would
+     pollute git commits if staged indiscriminately.
+   - Fix:
+     Initialized the repository using `git init`, added a tailored `.gitignore`
+     excluding Python bytecode artifacts, and staged only the required deliverables
+     (`requirements.txt`, `models.py`, `db.py`, `.gitignore`) under the commit
+     message: "feat(backend): SQLite schema, authentic NSSTA seed data, and persistent officer profile".
+================================================================================
