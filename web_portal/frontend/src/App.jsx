@@ -6,6 +6,57 @@ import CadreTelemetryView from './components/CadreTelemetryView';
 import RolePickerModal from './components/RolePickerModal';
 import Toast from './components/Toast';
 
+const INITIAL_CADRE_ASSESSMENT = {
+  title: "Mandatory Statutory Competency Evaluation: MoSPI Field Directives",
+  subtitle: "Synthesized from latest NSSTA statutory circulars by Cadre Administration.",
+  sourceDocument: "MoSPI_NSSTA_Technical_Compendium_Sample.pdf",
+  dispatchedAt: "Active Session",
+  questions: [
+    {
+      id: "KSI-001",
+      level: "Level 1: Recall",
+      domain: "Statistical Theory & National Accounts",
+      question: "What does Gross Value Added (GVA) at basic prices measure according to the System of National Accounts (SNA 2008) adopted by MoSPI?",
+      options: [
+        "A) The value of output produced less intermediate consumption, incorporating production taxes less production subsidies.",
+        "B) The retail market value of household consumption purchases including all distribution markups and transit costs.",
+        "C) The aggregate factor cost of labour and capital inputs excluding all indirect taxes and subsidies.",
+        "D) The total volume of physical output unadjusted for intermediate raw material consumption."
+      ],
+      correctIndex: 0,
+      citation: "SNA 2008 / NAD: GVA at basic prices is defined as gross output minus intermediate consumption, incorporating production taxes less production subsidies."
+    },
+    {
+      id: "KSI-002",
+      level: "Level 2: Conceptual Analysis",
+      domain: "Price Statistics",
+      question: "How does the Producer Price Index (PPI) conceptually differ from the Consumer Price Index (CPI) in macroeconomic compilation and deflation?",
+      options: [
+        "A) PPI measures selling prices from the domestic producer perspective at the factory gate, serving as output deflators, whereas CPI measures retail buyer prices.",
+        "B) PPI evaluates retail consumer baskets in metropolitan zones while CPI tracks agricultural farmgate transactions.",
+        "C) PPI excludes all industrial manufacturing goods while CPI monitors raw mining output exclusively.",
+        "D) PPI is calculated without Laspeyres expenditure weighting while CPI uses geometric unweighted averaging."
+      ],
+      correctIndex: 0,
+      citation: "Price Statistics Division: CPI measures retail prices paid by consumers, whereas PPI evaluates price shifts from the perspective of domestic sellers at the factory gate."
+    },
+    {
+      id: "KSI-003",
+      level: "Level 3: Procedural Application",
+      domain: "Field Operations & Survey Sampling",
+      question: "Under FOD sampling methodology for PLFS, when is a supervisor procedurally required to form hamlet-groups in a rural First Stage Unit (FSU)?",
+      options: [
+        "A) Whenever the estimated population of the FSU reaches or exceeds 1,200 persons (approx. 300 households).",
+        "B) Exclusively when satellite imagery indicates non-contiguous agricultural boundaries.",
+        "C) Only if the total number of enterprise units in the village exceeds 500 establishments.",
+        "D) Whenever the simple random sampling without replacement (SRSWOR) variance exceeds 5%."
+      ],
+      correctIndex: 0,
+      citation: "FOD Survey Sampling Manual: Hamlet-group formation (rural) and sub-block formation (urban) is mandatory whenever the estimated population reaches or exceeds 1,200 persons."
+    }
+  ]
+};
+
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -48,6 +99,22 @@ export default function App() {
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [toast, setToast] = useState(null);
 
+  // Shared Cadre Assessment Dispatched by Admin to Officer Portal
+  const [cadreAssessment, setCadreAssessment] = useState(() => {
+    try {
+      const saved = localStorage.getItem('ksi_cadre_assessment');
+      if (saved) return JSON.parse(saved);
+    } catch (_) {}
+    return INITIAL_CADRE_ASSESSMENT;
+  });
+
+  const handleDispatchAssessment = (newAssessment) => {
+    setCadreAssessment(newAssessment);
+    try {
+      localStorage.setItem('ksi_cadre_assessment', JSON.stringify(newAssessment));
+    } catch (_) {}
+  };
+
   const showToast = (message, type = 'info') => {
     setToast({ message, type });
   };
@@ -60,7 +127,7 @@ export default function App() {
       showToast('Switched view to: Officer / Learner (SSO/JSO)', 'info');
     } else if (selectedRole === 'admin') {
       setActiveTab('telemetry');
-      showToast('Switched view to: Administrator (Cadre Telemetry)', 'info');
+      showToast('Switched view to: Administrator (Cadre Telemetry & Dispatcher)', 'info');
     }
   };
 
@@ -90,9 +157,18 @@ export default function App() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
         <ErrorBoundary>
           {activeTab === 'competency' && <OfficerCompetencyView showToast={showToast} />}
-          {activeTab === 'synthesizer' && <StatutoryAssessment showToast={showToast} />}
+          {activeTab === 'synthesizer' && (
+            <StatutoryAssessment
+              showToast={showToast}
+              cadreAssessment={cadreAssessment}
+            />
+          )}
           {activeTab === 'telemetry' && role === 'admin' && (
-            <CadreTelemetryView showToast={showToast} />
+            <CadreTelemetryView
+              showToast={showToast}
+              cadreAssessment={cadreAssessment}
+              onDispatchAssessment={handleDispatchAssessment}
+            />
           )}
         </ErrorBoundary>
       </main>
@@ -108,7 +184,6 @@ export default function App() {
           <div className="flex flex-wrap items-center justify-center sm:justify-end gap-2 text-[11px] text-slate-400">
             <span>Mission Karmayogi Bharat</span>
             <span>•</span>
-            {/* Priority 4: Strictly "DPDP 2023 Aligned" */}
             <span>DPDP 2023 Aligned</span>
             <span>•</span>
             <span className="font-semibold text-slate-600">SIH26101 Final Architecture</span>

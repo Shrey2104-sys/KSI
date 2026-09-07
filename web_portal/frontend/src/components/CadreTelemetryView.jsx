@@ -11,8 +11,9 @@ import {
   FileSpreadsheet,
 } from 'lucide-react';
 import { fetchCadreTelemetry } from '../services/api';
+import AdminIngestionPanel from './AdminIngestionPanel';
 
-export default function CadreTelemetryView({ showToast }) {
+export default function CadreTelemetryView({ showToast, cadreAssessment, onDispatchAssessment }) {
   const [telemetry, setTelemetry] = useState({
     records: [
       {
@@ -181,6 +182,13 @@ export default function CadreTelemetryView({ showToast }) {
 
         </div>
       </div>
+
+      {/* NSSTA Statutory Document Ingestion & Cadre Assessment Dispatcher (Admin Exclusive) */}
+      <AdminIngestionPanel
+        cadreAssessment={cadreAssessment}
+        onDispatchAssessment={onDispatchAssessment}
+        showToast={showToast}
+      />
 
       {/* Interactive Directorate Heatmap Table */}
       <div className="rounded-2xl border border-[#f0e6dc] bg-white shadow-sm overflow-hidden">

@@ -4,7 +4,12 @@ import { UserCheck, FileText, LayoutDashboard, ShieldCheck, Cpu, ArrowLeftRight 
 export default function Navbar({ activeTab, setActiveTab, viewMode = 'officer', onSwitchView }) {
   const allTabs = [
     { id: 'competency', label: 'Officer Competency & Pathways', shortLabel: 'Competency', icon: UserCheck },
-    { id: 'synthesizer', label: 'Statutory Assessment Synthesizer', shortLabel: 'Assessment', icon: FileText },
+    { 
+      id: 'synthesizer', 
+      label: viewMode === 'officer' ? 'Assigned Statutory Assessment' : 'Statutory Assessment', 
+      shortLabel: 'Assessment', 
+      icon: FileText 
+    },
     { id: 'telemetry', label: 'Directorate Cadre Telemetry', shortLabel: 'Telemetry', icon: LayoutDashboard },
   ];
 
