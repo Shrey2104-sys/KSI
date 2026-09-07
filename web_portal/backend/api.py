@@ -165,10 +165,15 @@ async def handle_generate_quiz(
         "5. Return ONLY the JSON object with key 'questions'. No commentary or markdown formatting outside JSON."
     )
 
+    full_prompt = (
+        f"{system_prompt}\n\n"
+        f"Official Document Context (first 4,500 chars):\n{context}{nonce_suffix}\n\n"
+        "Generate exactly 3 Bloom-tiered questions strictly conforming to the JSON schema."
+    )
+
     ollama_payload = {
         "model": "qwen2.5:7b-instruct",
-        "system": system_prompt,
-        "prompt": f"Official Document Context (first 4,500 chars):\n{context}{nonce_suffix}\n\nGenerate the 3 Bloom-tiered questions strictly conforming to the JSON schema.",
+        "prompt": full_prompt,
         "format": "json",
         "stream": False,
         "options": {
@@ -198,7 +203,7 @@ async def handle_generate_quiz(
     if resp.status_code != 200:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Ollama inference returned non-200 status code: {resp.status_code}",
+            detail=f"Ollama inference returned non-200 status code {resp.status_code}: {resp.text[:200]}",
         )
 
     try:
@@ -215,6 +220,15 @@ async def handle_generate_quiz(
                 if isinstance(val, list) and len(val) == 3:
                     parsed_json = {"questions": val}
                     break
+
+        # Normalize questions list to enforce exactly 4 options per question
+        if isinstance(parsed_json, dict) and "questions" in parsed_json and isinstance(parsed_json["questions"], list):
+            for q in parsed_json["questions"]:
+                if isinstance(q, dict) and "options" in q and isinstance(q["options"], list):
+                    if len(q["options"]) > 4:
+                        q["options"] = q["options"][:4]
+                    if q.get("correctIndex", 0) >= 4:
+                        q["correctIndex"] = 3
 
         quiz_obj = QuizResponse(**parsed_json)
         if len(quiz_obj.questions) != 3:
