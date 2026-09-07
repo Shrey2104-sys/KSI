@@ -151,7 +151,7 @@ export default function CadreTelemetryView({ showToast }) {
             </div>
             <div className="mt-1">
               <span className="inline-block text-xs font-bold px-2.5 py-0.5 rounded bg-rose-500/20 text-rose-200 border border-rose-300/30">
-                Modern Tools (Python / GIS)
+                Technical Tools (Python, R, SQL, GIS)
               </span>
             </div>
             <p className="text-[11px] text-rose-200 font-semibold mt-1">

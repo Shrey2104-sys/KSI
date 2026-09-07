@@ -5,9 +5,15 @@ Reuses verified SQLite persistence, L2 vector gap algorithms, and local Ollama M
 
 from __future__ import annotations
 
+import hashlib
+import json
 import sys
+import time
 from pathlib import Path
 from typing import Any, Optional
+
+import fitz  # PyMuPDF
+import httpx
 
 # Ensure root directory is in sys.path for direct imports of db, engine, and models
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
@@ -18,7 +24,7 @@ import db
 import engine
 from models import BLOOM_LEVELS, OfficerProfile, SynthesizedMCQ, iGOTCourse
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile, status
+from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -32,14 +38,17 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Enable CORS Middleware allowing origins: ["http://localhost:5173", "http://127.0.0.1:5173"]
+# Enable CORS Middleware for dev environments and preview deployments
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# In-memory cache for deterministic context quiz responses
+QUIZ_CACHE: dict[str, dict[str, Any]] = {}
 
 
 # ==============================================================================
@@ -61,6 +70,185 @@ class InferDossierRequest(BaseModel):
 
 class EnrollCourseRequest(BaseModel):
     course_id: str = Field(..., description="iGOT Course identifier to enroll in")
+
+
+class QuizQuestion(BaseModel):
+    id: str = Field(..., description="Question identifier, e.g. KSI-001")
+    level: str = Field(..., description="Bloom Taxonomy level: Level 1: Recall, Level 2: Conceptual Analysis, Level 3: Procedural Application")
+    domain: str = Field(..., description="Operational Domain")
+    question: str = Field(..., description="Question stem")
+    options: list[str] = Field(..., description="Exactly 4 multiple choice options")
+    correctIndex: int = Field(..., ge=0, le=3, description="0-indexed position of the correct option")
+    citation: str = Field(..., description="Statutory citation or reference from source document")
+
+
+class QuizResponse(BaseModel):
+    questions: list[QuizQuestion]
+
+
+# ==============================================================================
+# OBSERVABLE PDF-TO-QUIZ INFERENCE PIPELINE (PRIORITY 2 & 3)
+# ==============================================================================
+
+async def handle_generate_quiz(
+    file: UploadFile = File(...),
+    bypass_cache: bool = Query(False),
+) -> dict[str, Any]:
+    """
+    Ingests official PDF, extracts text via PyMuPDF, validates character count,
+    slices first 4,500 characters, and prompts local Ollama (qwen2.5:7b-instruct)
+    in JSON mode to synthesize 3 Bloom-tiered evaluation questions.
+    """
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="PDF Text Extraction Failed: Invalid file format. Only .pdf documents are supported.",
+        )
+
+    try:
+        pdf_bytes = await file.read()
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        pages_text: list[str] = []
+        for page in doc:
+            t = page.get_text()
+            if t:
+                pages_text.append(t)
+        doc.close()
+        clean_text = " ".join(" ".join(pages_text).split())
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"PDF Text Extraction Failed: Could not parse PDF binary stream ({str(exc)}).",
+        )
+
+    if len(clean_text) < 100:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="PDF Text Extraction Failed: Insufficient parseable text found. Document may be a scanned image requiring OCR.",
+        )
+
+    context = clean_text[:4500]
+    cache_key = hashlib.sha256(context.encode("utf-8")).hexdigest()
+
+    if not bypass_cache and cache_key in QUIZ_CACHE:
+        return QUIZ_CACHE[cache_key]
+
+    nonce_suffix = f"\n\n[Bypass Cache Nonce: {time.time_ns()}]" if bypass_cache else ""
+
+    system_prompt = (
+        "You are an expert psychometrician and statistical evaluator for the Ministry of Statistics and Programme Implementation (MoSPI), Government of India.\n"
+        "Your objective is to generate an authentic statutory assessment quiz directly from the provided official compendium or circular text.\n"
+        "You must return ONLY valid JSON matching this exact schema:\n"
+        "{\n"
+        '  "questions": [\n'
+        "    {\n"
+        '      "id": "KSI-001",\n'
+        '      "level": "Level 1: Recall",\n'
+        '      "domain": "Statistical Theory & National Accounts",\n'
+        '      "question": "Question text...",\n'
+        '      "options": ["Option A", "Option B", "Option C", "Option D"],\n'
+        '      "correctIndex": 0,\n'
+        '      "citation": "Statutory citation..."\n'
+        "    }\n"
+        "  ]\n"
+        "}\n"
+        "STRICT RULES:\n"
+        "1. You MUST generate EXACTLY 3 questions, each corresponding to one Bloom Taxonomy tier:\n"
+        "   - Question 1: 'Level 1: Recall' (Statutory Recall of definitions, base years, or legal mandates)\n"
+        "   - Question 2: 'Level 2: Conceptual Analysis' (Comparative reasoning, formula mechanisms, or methodological differentiation)\n"
+        "   - Question 3: 'Level 3: Procedural Application' (Real-world statistical officer application, deflation, survey sampling, or classification scenario)\n"
+        "2. Each question MUST have EXACTLY 4 distinct options.\n"
+        "3. 'correctIndex' MUST be an integer between 0 and 3 indexing the correct option in 'options'.\n"
+        "4. 'citation' MUST provide an explicit statutory clause, manual reference, or exact textual justification from the context.\n"
+        "5. Return ONLY the JSON object with key 'questions'. No commentary or markdown formatting outside JSON."
+    )
+
+    ollama_payload = {
+        "model": "qwen2.5:7b-instruct",
+        "system": system_prompt,
+        "prompt": f"Official Document Context (first 4,500 chars):\n{context}{nonce_suffix}\n\nGenerate the 3 Bloom-tiered questions strictly conforming to the JSON schema.",
+        "format": "json",
+        "stream": False,
+        "options": {
+            "temperature": 0.25,
+        },
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=180.0) as client:
+            resp = await client.post("http://localhost:11434/api/generate", json=ollama_payload)
+    except httpx.ConnectError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Local Ollama service unreachable at localhost:11434",
+        )
+    except httpx.TimeoutException:
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="Inference engine timed out after 180s",
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Inference communication error: {str(exc)}",
+        )
+
+    if resp.status_code != 200:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Ollama inference returned non-200 status code: {resp.status_code}",
+        )
+
+    try:
+        res_data = resp.json()
+        raw_text_out = res_data.get("response", "").strip()
+        if raw_text_out.startswith("```"):
+            lines = raw_text_out.splitlines()
+            raw_text_out = "\n".join([l for l in lines if not l.startswith("```")])
+        parsed_json = json.loads(raw_text_out)
+        if isinstance(parsed_json, list):
+            parsed_json = {"questions": parsed_json}
+        elif isinstance(parsed_json, dict) and "questions" not in parsed_json:
+            for val in parsed_json.values():
+                if isinstance(val, list) and len(val) == 3:
+                    parsed_json = {"questions": val}
+                    break
+
+        quiz_obj = QuizResponse(**parsed_json)
+        if len(quiz_obj.questions) != 3:
+            raise ValueError(f"Expected exactly 3 Bloom-tiered questions, received {len(quiz_obj.questions)}")
+        for idx, q in enumerate(quiz_obj.questions):
+            if len(q.options) != 4:
+                raise ValueError(f"Question {idx + 1} ({q.id}) must have exactly 4 options, found {len(q.options)}")
+            if not (0 <= q.correctIndex <= 3):
+                raise ValueError(f"Question {idx + 1} ({q.id}) correctIndex {q.correctIndex} is out of bounds [0-3]")
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Inference output schema validation failed: {str(exc)}",
+        )
+
+    result_dict = quiz_obj.model_dump()
+    QUIZ_CACHE[cache_key] = result_dict
+    return result_dict
+
+
+@app.post("/generate-quiz")
+async def generate_quiz_root(
+    file: UploadFile = File(...),
+    bypass_cache: bool = Query(False),
+) -> dict[str, Any]:
+    return await handle_generate_quiz(file=file, bypass_cache=bypass_cache)
+
+
+@app.post("/api/generate-quiz")
+async def generate_quiz_api(
+    file: UploadFile = File(...),
+    bypass_cache: bool = Query(False),
+) -> dict[str, Any]:
+    return await handle_generate_quiz(file=file, bypass_cache=bypass_cache)
 
 
 # ==============================================================================

@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import Navbar from './components/Navbar';
 import OfficerCompetencyView from './components/OfficerCompetencyView';
-import MCQSynthesizerView from './components/MCQSynthesizerView';
+import StatutoryAssessment from './components/StatutoryAssessment';
 import CadreTelemetryView from './components/CadreTelemetryView';
+import RolePickerModal from './components/RolePickerModal';
 import Toast from './components/Toast';
 
 class ErrorBoundary extends React.Component {
@@ -41,25 +42,58 @@ class ErrorBoundary extends React.Component {
 }
 
 export default function App() {
+  // Priority 1: View Selector State ('picker', 'officer', 'admin')
+  const [role, setRole] = useState(null); // null means landing picker view is shown
   const [activeTab, setActiveTab] = useState('competency');
+  const [showRoleModal, setShowRoleModal] = useState(false);
   const [toast, setToast] = useState(null);
 
   const showToast = (message, type = 'info') => {
     setToast({ message, type });
   };
 
+  const handleSelectRole = (selectedRole) => {
+    setRole(selectedRole);
+    setShowRoleModal(false);
+    if (selectedRole === 'officer') {
+      setActiveTab('competency');
+      showToast('Switched view to: Officer / Learner (SSO/JSO)', 'info');
+    } else if (selectedRole === 'admin') {
+      setActiveTab('telemetry');
+      showToast('Switched view to: Administrator (Cadre Telemetry)', 'info');
+    }
+  };
+
+  // Priority 1: Full-screen landing view before main portal tabs load
+  if (!role) {
+    return (
+      <RolePickerModal
+        currentRole={role}
+        onSelectRole={handleSelectRole}
+        isSwitching={false}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen w-full overflow-x-hidden bg-[#fdf8f3] flex flex-col selection:bg-orange-100 selection:text-orange-900 font-sans text-slate-800">
       
-      {/* Sticky Sovereign Navigation Bar */}
-      <Navbar activeTab={activeTab} setActiveTab={setActiveTab} />
+      {/* Sticky Sovereign Navigation Bar with viewMode and compact switcher */}
+      <Navbar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        viewMode={role}
+        onSwitchView={() => setShowRoleModal(true)}
+      />
 
       {/* Main View Container bounded to max-w-7xl with ErrorBoundary */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
         <ErrorBoundary>
           {activeTab === 'competency' && <OfficerCompetencyView showToast={showToast} />}
-          {activeTab === 'synthesizer' && <MCQSynthesizerView showToast={showToast} />}
-          {activeTab === 'telemetry' && <CadreTelemetryView showToast={showToast} />}
+          {activeTab === 'synthesizer' && <StatutoryAssessment showToast={showToast} />}
+          {activeTab === 'telemetry' && role === 'admin' && (
+            <CadreTelemetryView showToast={showToast} />
+          )}
         </ErrorBoundary>
       </main>
 
@@ -74,12 +108,23 @@ export default function App() {
           <div className="flex flex-wrap items-center justify-center sm:justify-end gap-2 text-[11px] text-slate-400">
             <span>Mission Karmayogi Bharat</span>
             <span>•</span>
-            <span>DPDP Act 2023 Certified</span>
+            {/* Priority 4: Strictly "DPDP 2023 Aligned" */}
+            <span>DPDP 2023 Aligned</span>
             <span>•</span>
             <span className="font-semibold text-slate-600">SIH26101 Final Architecture</span>
           </div>
         </div>
       </footer>
+
+      {/* Role Switcher Modal when toggled from header */}
+      {showRoleModal && (
+        <RolePickerModal
+          currentRole={role}
+          onSelectRole={handleSelectRole}
+          onClose={() => setShowRoleModal(false)}
+          isSwitching={true}
+        />
+      )}
 
       {/* Active Toast Notification */}
       <Toast toast={toast} onClose={() => setToast(null)} />
