@@ -162,7 +162,7 @@ FEATURE 1: DYNAMIC OFFICER COMPETENCY MATRIX & RADAR SPIDER VISUALIZATION
 - Working Status: 100% OPERATIONAL & VERIFIED
 - Capabilities:
   1. Automated retrieval of authentic officer records (Default: `ISS-2026-9042`,
-     Shreyas Suresh Attavar, Junior Statistical Officer, Field Operations Division).
+     Thejas B K Shetty, Junior Statistical Officer, Field Operations Division).
   2. Live vector calibration across the 4 MoSPI canonical domains:
      - Domain 1: Statistical Theory & National Accounts
      - Domain 2: Technical Tools (Python, R, SQL, GIS)

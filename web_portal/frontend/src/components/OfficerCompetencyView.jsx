@@ -33,7 +33,7 @@ MINISTRY OF STATISTICS AND PROGRAMME IMPLEMENTATION (MoSPI)
 GOVERNMENT OF INDIA - SUBORDINATE STATISTICAL SERVICE / INDIAN STATISTICAL SERVICE
 
 OFFICER IDENTIFIER: ISS-2026-9042
-FULL NAME: Shreyas Suresh Attavar
+FULL NAME: Thejas B K Shetty
 CADRE: Indian Statistical Service (ISS)
 DESIGNATION: Junior Statistical Officer (JSO)
 CURRENT POSTING / DIVISION: Field Operations Division (FOD), Regional Office
@@ -239,7 +239,7 @@ export default function OfficerCompetencyView({ showToast }) {
             <div>
               <div className="flex flex-wrap items-center gap-2.5">
                 <h2 className="text-xl font-bold text-slate-900">
-                  {officer ? officer.name : 'Shreyas Suresh Attavar'}
+                  {officer ? officer.name : 'Thejas B K Shetty'}
                 </h2>
                 <span className="inline-flex items-center rounded-md bg-[#fdf8f3] px-2.5 py-0.5 text-xs font-semibold text-[#1d5ba5] border border-[#f0e6dc] font-mono">
                   {officer ? officer.officer_id : 'ISS-2026-9042'}

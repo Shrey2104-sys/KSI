@@ -85,7 +85,7 @@ MINISTRY OF STATISTICS AND PROGRAMME IMPLEMENTATION (MoSPI)
 GOVERNMENT OF INDIA - SUBORDINATE STATISTICAL SERVICE / INDIAN STATISTICAL SERVICE
 
 OFFICER IDENTIFIER: ISS-2026-9042
-FULL NAME: Shreyas Suresh Attavar
+FULL NAME: Thejas B K Shetty
 CADRE: Indian Statistical Service (ISS)
 DESIGNATION: Junior Statistical Officer (JSO)
 CURRENT POSTING / DIVISION: Field Operations Division (FOD), Regional Office
@@ -170,7 +170,7 @@ class JsonResponse(str):
 # Precomputed verified payload data for offline zero-latency demo execution
 _VERIFIED_DOSSIER_RESPONSE = {
     "officer_id": "ISS-2026-9042",
-    "name": "Shreyas Suresh Attavar",
+    "name": "Thejas B K Shetty",
     "designation": "Junior Statistical Officer (JSO)",
     "cadre": "Indian Statistical Service (ISS)",
     "division": "Field Operations Division (FOD)",
@@ -530,7 +530,7 @@ def init_db(db_path: str = DB_PATH) -> None:
             VALUES (?, ?, ?, ?, ?, ?);
         """, (
             seed_officer_id,
-            "Shreyas Suresh Attavar",
+            "Thejas B K Shetty",
             "Indian Statistical Service (ISS)",
             "Junior Statistical Officer (JSO)",
             "Field Operations Division (FOD)",

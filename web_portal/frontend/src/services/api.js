@@ -17,7 +17,7 @@ export const DOMAINS = [
 
 const SEED_OFFICER = {
   officer_id: 'ISS-2026-9042',
-  name: 'Shreyas Suresh Attavar',
+  name: 'Thejas B K Shetty',
   cadre: 'Indian Statistical Service (ISS)',
   designation: 'Junior Statistical Officer (JSO)',
   division: 'Field Operations Division (FOD), Regional Office',
